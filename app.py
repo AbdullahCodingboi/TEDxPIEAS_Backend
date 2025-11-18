@@ -19,7 +19,16 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 if not os.path.exists(CSV_FILE):
     with open(CSV_FILE, mode="w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
-        writer.writerow(["Name", "Email", "Phone", "CNIC", "University", "CardImagePath", "Timestamp"])
+        writer.writerow([
+            "Name", 
+            "University", 
+            "Email", 
+            "CNIC", 
+            "ContactNumber", 
+            "CNIC_Front_Image", 
+            "CNIC_Back_Image", 
+            "Timestamp"
+        ])
 
 
 @app.route("/")
@@ -31,38 +40,50 @@ def home():
 def register():
     try:
         # Get form data (multipart/form-data)
-        name = request.form.get("name")
-        email = request.form.get("email")
-        phone = request.form.get("phone")
-        cnic = request.form.get("cnic")
-        university = request.form.get("university")
-        file = request.files.get("university_card_picture")
+        name = request.form.get("Name")
+        university = request.form.get("University")
+        email = request.form.get("Email")
+        cnic = request.form.get("CNIC")
+        contact = request.form.get("ContactNumber")
+
+        front_img = request.files.get("CNIC_Front_Image")
+        back_img = request.files.get("CNIC_Back_Image")
 
         print("\n✅ Received data:")
-        print(f"Name: {name}, Email: {email}, Phone: {phone}, CNIC: {cnic}, University: {university}")
+        print(f"Name: {name}, University: {university}, Email: {email}, CNIC: {cnic}, Contact: {contact}")
 
         # Validation
-        if not all([name, email, phone, cnic, university, file]):
-            print("❌ Missing fields or file.")
-            return jsonify({"error": "All fields (including image) are required"}), 400
+        if not all([name, university, email, cnic, contact, front_img, back_img]):
+            print("❌ Missing fields or files.")
+            return jsonify({"error": "All fields and both images are required"}), 400
 
-        # Save image file
+        # ---- Save images ----
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{name.replace(' ', '_')}_{timestamp_str}.jpg"
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
 
-        # Save record to CSV
+        front_filename = f"{name.replace(' ', '_')}_front_{timestamp_str}.jpg"
+        back_filename = f"{name.replace(' ', '_')}_back_{timestamp_str}.jpg"
+
+        front_filepath = os.path.join(UPLOAD_FOLDER, front_filename)
+        back_filepath = os.path.join(UPLOAD_FOLDER, back_filename)
+
+        front_img.save(front_filepath)
+        back_img.save(back_filepath)
+
+        # ---- Save record to CSV ----
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(CSV_FILE, mode="a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow([name, email, phone, cnic, university, filepath, timestamp])
+            writer.writerow([
+                name, university, email, cnic, contact,
+                front_filepath, back_filepath, timestamp
+            ])
 
-        # Convert CSV to Excel
+        # ---- Convert CSV to Excel ----
         df = pd.read_csv(CSV_FILE)
         df.to_excel(EXCEL_FILE, index=False)
 
-        print(f"📸 Image saved at: {filepath}")
+        print(f"📸 Front image saved at: {front_filepath}")
+        print(f"📸 Back image saved at: {back_filepath}")
         print("✅ Registration saved successfully!")
 
         return jsonify({"message": "Registration successful!"}), 200
